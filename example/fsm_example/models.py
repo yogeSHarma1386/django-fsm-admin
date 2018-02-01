@@ -3,6 +3,7 @@ from pprint import pprint
 from django.db import models
 from django.dispatch.dispatcher import receiver
 from django.utils import timezone
+from django.utils.decorators import classproperty
 from django_fsm import FSMField, transition, GET_STATE, RETURN_VALUE, ConcurrentTransitionMixin
 from django_fsm.signals import pre_transition
 
@@ -20,15 +21,19 @@ class State(ModelEnum):
     REJECTED = 'REJECTED'                   # Rejection state
     FOR_MODERATORS = 'FOR_MODERATORS'       # Moderators reviewing state
 
-    @classmethod
-    def get_states__accessible_by_employee(cls):
+    @classproperty
+    def all_choices(self):
+        return self.paired_details()
+
+    @classproperty
+    def accessible_states_by_employee(self):
         """An employee can access the only if the post.state is not State.DELETED and State.FOR_MODERATORS"""
-        return [state.value for index, state in enumerate(cls.get_all_members())
+        return [state.value for index, state in enumerate(self.get_all_members())
                 if state.name not in [State.DELETED,
                                       State.FOR_MODERATORS]]
 
-    @classmethod
-    def get_states__previously_published(cls):
+    @classproperty
+    def previously_published_states(self):
         """Post would be published at some point of time only if post.state is one of these:
             State.PUBLISHED
             State.EXPIRED
@@ -49,7 +54,7 @@ class PublishableModel(ConcurrentTransitionMixin, models.Model):
     state = FSMField(
         default=State.DRAFT.value,
         verbose_name='Publication State',
-        choices=State.paired_details(),
+        choices=State.all_choices,
         protected=True,
     )
 
